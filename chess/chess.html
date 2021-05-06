@@ -11,6 +11,7 @@
   <script src="js/chessboard-1.0.0.min.js"></script>
   <script src="js/chess.js"></script>
   <script src="board.js"></script>
+  <script defer src="https://use.fontawesome.com/releases/v5.0.8/js/all.js"></script>
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital@1&display=swap" rel="stylesheet">
 </head>
@@ -31,6 +32,14 @@
       <button id = "cancelButton">Cancel</button>
     </div>
   </div>
+  <div id = "joinLinkContainer" class = "panel">
+  <form style="font-size: 0;">
+    <label class = "linkLabel" for = "joinLink">Share:</label>
+    <input id = "joinLink" disabled value="http://localhost:3000/join?game_id=">
+    <p class = "copyButton">copy <i class="far fa-clipboard fa-xs"> </i></p>
+  </form>
+  </div>
+
   <script>
     run_display();
   </script>

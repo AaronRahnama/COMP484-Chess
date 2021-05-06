@@ -3,8 +3,9 @@
 //npm install nodemon
 //npm install socket.io
 //npm install uuid
-
+const MAX_GAMES = 100;
 const portNUM = 3000;
+
 const express = require('express');
 const app = express();
 const { v4: uuidv4 } = require('uuid');
@@ -12,15 +13,11 @@ const httpServer = require("http").createServer(app);
 const { Chess } = require('./chess.js')
 const io = require('socket.io')(httpServer);
 
-//const socket = io("http://localhost");
-
-// read chess.html file into memory
-
-
 let GAME_COUNT = 0;
-let GAME_ID = [];
-let GAME = [];
+let GAMES = [];
 
+
+// ================= Handle HTTP requests  =================  
 app.use(
     express.urlencoded({extended:true}),
     express.json(),
@@ -31,93 +28,184 @@ app.get('/create',(req,res)=>{
     res.sendFile(__dirname + "/username.html");
 });
 
-app.get('/testgame',(req,res)=>{ 
-    res.cookie('game_id',"7da40023-f8dc-4f98-9522-73ec87f19712",{sameSite:'strict'});
-    res.sendFile(__dirname + "/chess/chess.html");
-});
-
-app.get('/join',(req,res)=>{ 
-    let game_id = req.query.game_id;
-    //req.cookie('game_id',game_id)
-    console.log(game_id);
+app.get('/join',(req,res)=>{
+    // Send game files
     res.sendFile(__dirname + "/chess/chess.html");
 });
 
 app.post('/create',(req,res) => {
-    let gid = CreateGame(req.body.user);
-    res.cookie('game_id',gid,{sameSite:'strict'});
+    if(GAME_COUNT < MAX_GAMES)
+    {
+        // Grab the chosen orienation from creator
+        let this_orientation = req.body.orientation;
+        if(this_orientation == 'random')
+        {
+            let rand = Math.floor(Math.random()*2);
+            if(rand == 0) 
+            {
+                this_orientation = 'white';
+            }
+            else
+            {
+                this_orientation = 'black';
+            }
+        }
+        GAMES[GAME_COUNT] = CreateGame(this_orientation);
+        // Send Game ID
+        res.cookie('game_id',GAMES[GAME_COUNT].game_id,{sameSite:'strict',path:'/'});
+        // Send User ID
+        res.cookie('user_id',GAMES[GAME_COUNT].user_id,{sameSite:'strict',path:'/'});
+        // Send board orientation
+        switch(this_orientation)
+        {
+            case 'white':
+                res.cookie('orientation','white',{sameSite:'lax',path:'/'});
+            break;
+            default:
+                res.cookie('orientation','black',{sameSite:'lax',path:'/'});
+            break;
+        }
+        GAME_COUNT++;
+    }
+    else
+    {
+        // Too many games in session
+        console.log("App.post(/create): Too many games in session.");
+    }
     res.sendFile(__dirname + "/chess/chess.html");
-    console.log(req.body.user);
 });
 
 //=================================================== New Game ===================================================
-function CreateGame(name)
+function CreateGame(orientation)
 {
-    //TODO: SEND GAME FILES
-    let this_id = uuidv4();
-    //GAME_ID[GAME_COUNT] = this_id;
-    //GAME[GAME_COUNT] = new Chess();
-    GAME_COUNT++;
-    return this_id;
+    // create a chessGame object and increment number of games.
+    let chessGame = {
+        game: new Chess(),
+        game_id: uuidv4(),
+        user_id:  uuidv4(),
+        user_id2: uuidv4(),
+        uid2_taken: false,
+        user2_orientation: 'white'
+    };
+    if(orientation == 'white')
+        chessGame.user2_orientation = 'black';
+    else
+        chessGame.user2_orientation = 'white'; 
+    return chessGame;
 }
 
-function findIndexByGameID (game_id)
+
+// Utility function to find the index
+function findIndexByGameID (this_gid)
 {
-    for(let ii = 0; ii < GAME_ID.length; ii++)
+    let ans = -1;
+    for(let ii = 0; ii < GAMES.length; ii++)
     {
-        if(GAME_ID[ii] == game_id)
+        if(GAMES[ii].game_id == this_gid)
         {
+            //console.log("findIndexByGameID: " + this_gid);
+            ans = ii;
             break;
         }
     }
-    return ii;
+    return ans;
 }
+
 
 function removeGame(index)
 {
-    //GAME_ID.splice(index,1);
-    //GAME.splice(index,1);
+    //console.log("removeGame: " + GAMES[index].game_id);
+    GAMES.splice(index,1);
     GAME_COUNT--;
 }
 
 
 // =================================================== Log Room messages ===================================================
-io.of("/").adapter.on("create-room", (room) => {
-    console.log(`room ${room} was created`);
-});
+// io.of("/").adapter.on("create-room", (room) => {
+//     console.log(`room ${room} was created`);
+// });
   
-io.of("/").adapter.on("join-room", (room, id) => {
-    console.log(`socket ${id} has joined room ${room}`);
-});
+// io.of("/").adapter.on("join-room", (room, id) => {
+//     console.log(`socket ${id} has joined room ${room}`);
+// });
 
-io.of("/").adapter.on("leave-room", (room, id) => {
-    console.log(`socket ${id} has left room ${room}`);
-});
+// io.of("/").adapter.on("leave-room", (room, id) => {
+//     console.log(`socket ${id} has left room ${room}`);
+// });
 
+
+// Delete game instance if all players leave.
 io.of("/").adapter.on("delete-room", (room, id) => {
-    removeGame();
-    console.log(`room ${room} was deleted`);
+    let index = findIndexByGameID(room);
+    if(index != -1)
+        removeGame(index);
+    // else
+    //     console.log("Room does not match any game.");
+    // console.log(`room ${room} was deleted`);
 });
 
 
-// TODO:
 // =================================================== Handle socket messages ===================================================
 
 io.on("connection", socket =>
 {
-
-    socket.on("join",(id) =>
+    let sender = socket.id;
+    socket.on("join",(this_gid,this_user) =>
     {
-        socket.join(id);
+        let index = findIndexByGameID(this_gid);      
+        if(index != -1)
+        {
+            //console.log("Socket.on(join): found index from game_id");
+            // Check if the incoming connection is a new user or returning user
+            let secondUser = (this_user != GAMES[index].user_id && GAMES[index].uid2_taken == false);
+            let returningUser = (this_user == GAMES[index].user_id || this_user == GAMES[index].user_id2);
+            if(secondUser)
+            {
+                // Send the second User ID and the proper board orientation to the new user.
+                socket.emit("cookie",{UID: GAMES[index].user_id2,color:GAMES[index].user2_orientation});
+                GAMES[index].uid2_taken = true;
+            }
+            if(secondUser || returningUser)
+            {
+                // send game update
+                //console.log("Socket.on(join): Attempt to join game room.");
+                socket.join(GAMES[index].game_id);
+                socket.emit("update",GAMES[index].game.fen());
+            }
+            else
+            {
+                // Connection attempt is a third unknown user.
+                console.log("Socket.on(join): Third User attempt.");
+            }
+        }
     });
 
+    // Move received from player, Validate move then send to other player.
     socket.on("move", (data) =>
     {
-        console.log("Move Received.");
-        console.log(data);
+        // console.log("Move Received.");
+        // console.log(data);
+        let index = findIndexByGameID(data.RM);
         // handle move from client (check if valid)
-            //if move is valid send move
-        socket.to(data.RM).emit("move",{SRC: data.SRC, TGT: data.TGT, PRM: data.PRM});
+        if(index != -1)
+        {
+            let move = GAMES[index].game.move({
+                from: data.SRC,
+                to: data.TGT,
+                promotion: data.PRM
+            });
+
+            if(move != null)
+            {
+                //if move is valid send move
+                socket.to(data.RM).emit("move",{SRC: data.SRC, TGT: data.TGT, PRM: data.PRM});
+            }
+            else
+            {
+                // move was invalid send server game state to fix client game state.
+                socket.to(socket.id).emit("update",GAMES[index].game.fen());
+            }
+        }
     });
 });
 
