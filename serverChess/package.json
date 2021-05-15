@@ -1,0 +1,21 @@
+{
+  "name": "chess_server",
+  "version": "1.0.0",
+  "description": "Chess server application for COMP 484",
+  "main": "chess_server.js",
+  "dependencies": {
+    "chess.js": "^0.11.0",
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "nodemon": "^2.0.7",
+    "socket.io": "^4.0.1",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon chess_server.js"
+  },
+  "author": "Ridge Tejuco",
+  "license": "ISC"
+}
