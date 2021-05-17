@@ -89,6 +89,12 @@ function run_display() {
         // check if illegal move
         if (move === null) return 'snapback'
         else board.position(game.fen()); //update board
+
+        if (game.game_over() == true) {
+            document.getElementById('status').innerHTML = "You Won!"
+            document.getElementById('status').style.color = 'green';
+        }
+        
     });
 
 

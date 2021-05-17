@@ -53,6 +53,14 @@
       {/if}
       <button on:click={handleLogout}> Logout </button>
     </div>
+
+    {#if !urlParams.game_id}
+    <h2 id="status"> Make a move!</h2>
+    {/if}
+
+    {#if urlParams.game_id}
+    <h2 id="status"> Make a move!</h2>
+    {/if}
     <div class={type} id="board1" />
 
     <div id="promotionBox" class="promotionGUI">
